@@ -1,7 +1,10 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Depends
 from pathlib import Path
 import shutil
-
+from src.auth.models import UserRegister, UserLogin
+from src.auth.auth import hash_password, verify_password, create_access_token
+from src.auth.dependencies import get_current_user
+from src.database.db import Database
 from src.rag.pipeline import RAGPipeline
 from src.database.db import Database
 
@@ -28,6 +31,37 @@ Path(UPLOAD_DIR).mkdir(exist_ok=True)
 def home():
     return {"message": "RAG Document QA API running"}
 
+@app.post("/register")
+def register(user: UserRegister):
+
+    existing = db.get_user_by_email(user.email)
+
+    if existing:
+        return {"error": "User already exists"}
+
+    password_hash = hash_password(user.password)
+
+    user_id = db.create_user(user.email, password_hash)
+
+    return {"message": "User created", "user_id": user_id}
+
+@app.post("/login")
+def login(user: UserLogin):
+
+    db_user = db.get_user_by_email(user.email)
+
+    if not db_user:
+        return {"error": "Invalid credentials"}
+
+    user_id = db_user[0]
+    password_hash = db_user[2]
+
+    if not verify_password(user.password, password_hash):
+        return {"error": "Invalid credentials"}
+
+    token = create_access_token(user_id)
+
+    return {"access_token": token}
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
@@ -42,8 +76,12 @@ async def upload_document(file: UploadFile = File(...)):
     return {"message": f"{file.filename} indexed successfully"}
 
 
+
 @app.post("/query")
-def query_documents(query: str):
+def query_documents(
+    query: str,
+    user_id: int = Depends(get_current_user)
+):
 
     results = pipeline.retrieve(query)
 
