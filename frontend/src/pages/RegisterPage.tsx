@@ -1,6 +1,7 @@
 import { useState } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
+import { Link } from "react-router-dom"
 
 export default function RegisterPage() {
 
@@ -45,11 +46,18 @@ export default function RegisterPage() {
         />
 
         <button
-          onClick={handleRegister}
-          className="bg-green-500 text-white w-full p-2 rounded"
-        >
-          Register
-        </button>
+  onClick={handleRegister}
+  className="bg-green-500 text-white w-full p-2 rounded mb-4"
+>
+  Register
+</button>
+
+<p className="text-sm text-center">
+  Already have an account?{" "}
+  <Link to="/" className="text-blue-600">
+    Login
+  </Link>
+</p>
 
       </div>
 

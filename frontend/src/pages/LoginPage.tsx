@@ -2,6 +2,8 @@ import { useState } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../auth/UseAuth"
+import { Link } from "react-router-dom"
+
 
 export default function LoginPage() {
 
@@ -51,10 +53,16 @@ export default function LoginPage() {
 
         <button
           onClick={handleLogin}
-          className="bg-blue-500 text-white w-full p-2 rounded"
-        >
-          Login
+          className="bg-blue-500 text-white w-full p-2 rounded mb-4">
+            Login
         </button>
+
+        <p className="text-sm text-center">
+          Don't have an account?{" "}
+          <Link to="/register" className="text-blue-600">
+              Register
+          </Link>
+        </p>
 
       </div>
 

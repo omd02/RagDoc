@@ -1,28 +1,46 @@
-import axios from "axios";
-
-export interface SearchResult {
-  text: string;
-  source: string;
-  page: number;
-}
+import axios from "axios"
 
 const API = axios.create({
   baseURL: "http://localhost:8000"
-});
+})
 
-export const uploadDocument = async (file: File) => {
-  const formData = new FormData();
-  formData.append("file", file);
+API.interceptors.request.use((config) => {
 
-  return API.post("/upload", formData);
-};
+  const token = localStorage.getItem("token")
 
-export const queryDocuments = async (query: string) => {
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
+
+})
+
+export const uploadDocument = (file: File) => {
+
+  const formData = new FormData()
+  formData.append("file", file)
+
+  return API.post("/upload", formData)
+
+}
+
+export const getDocuments = () => {
+
+  return API.get("/documents")
+
+}
+
+export const deleteDocument = (id: number) => {
+
+  return API.delete(`/documents/${id}`)
+
+}
+
+export const queryDocuments = (query: string) => {
+
   return API.post("/query", null, {
     params: { query }
-  });
-};
+  })
 
-export const getDocuments = async () => {
-  return API.get("/documents");
-};
+}

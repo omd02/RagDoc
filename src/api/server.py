@@ -7,7 +7,8 @@ from src.auth.dependencies import get_current_user
 from src.database.db import Database
 from src.rag.pipeline import RAGPipeline
 from src.database.db import Database
-
+from pathlib import Path
+import shutil
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -64,16 +65,24 @@ def login(user: UserLogin):
     return {"access_token": token}
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(
+    file: UploadFile = File(...),
+    user_id: int = Depends(get_current_user)
+):
 
-    file_path = f"{UPLOAD_DIR}/{file.filename}"
+    file_path = f"{UPLOAD_DIR}/{user_id}_{file.filename}"
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    doc_id = db.add_document(user_id, file.filename, file_path)
+
     pipeline.index_document(file_path)
 
-    return {"message": f"{file.filename} indexed successfully"}
+    return {
+        "message": "Document uploaded",
+        "document_id": doc_id
+    }
 
 
 
@@ -85,31 +94,29 @@ def query_documents(
 
     results = pipeline.retrieve(query)
 
-    formatted_results = []
-
-    for r in results:
-        formatted_results.append({
-            "text": r["text"],
-            "source": r["metadata"]["source"],
-            "page": r["metadata"]["page"]
-        })
-
-    return {"results": formatted_results}
-
+    return {"results": results}
 
 @app.get("/documents")
-def list_documents():
+def get_documents(user_id: int = Depends(get_current_user)):
 
-    docs = db.list_documents()
+    docs = db.get_documents(user_id)
 
-    formatted = []
+    results = []
 
     for d in docs:
-        formatted.append({
+        results.append({
             "id": d[0],
-            "filename": d[1],
-            "path": d[2],
-            "uploaded": d[3]
+            "filename": d[2]
         })
 
-    return {"documents": formatted}
+    return {"documents": results}
+
+@app.delete("/documents/{doc_id}")
+def delete_document(
+    doc_id: int,
+    user_id: int = Depends(get_current_user)
+):
+
+    db.delete_document(doc_id)
+
+    return {"message": "Document deleted"}

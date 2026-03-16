@@ -1,31 +1,45 @@
-import { useState } from "react";
-import { uploadDocument } from "../api/api";
+import { useState } from "react"
+import { uploadDocument } from "../api/api"
 
-export default function UploadPanel() {
+interface UploadPanelProps {
+  refreshDocuments: () => void
+}
 
-  const [file, setFile] = useState<File | null>(null);
-  const [status, setStatus] = useState("");
+export default function UploadPanel({
+  refreshDocuments,
+}: UploadPanelProps): JSX.Element {
+
+  const [file, setFile] = useState<File | null>(null)
+  const [status, setStatus] = useState("")
 
   const handleUpload = async () => {
 
-    if (!file) return;
+    if (!file) return
 
-    setStatus("Uploading...");
+    setStatus("Uploading...")
 
     try {
-      await uploadDocument(file);
-      setStatus("Document indexed successfully");
+
+      await uploadDocument(file)
+
+      setStatus("Upload successful")
+
+      refreshDocuments()
+
     } catch {
-      setStatus("Upload failed");
+
+      setStatus("Upload failed")
+
     }
 
-  };
+  }
 
   return (
-    <div className="bg-white/90 backdrop-blur p-6 rounded-xl shadow-xl w-full">
+
+    <div className="bg-white/90 backdrop-blur text-black p-6 rounded-xl shadow-lg">
 
       <h2 className="text-xl font-semibold mb-4">
-        Upload PDF
+        Upload Document
       </h2>
 
       <input
@@ -36,13 +50,16 @@ export default function UploadPanel() {
 
       <button
         onClick={handleUpload}
-        className="px-4 py-2 bg-blue-500 text-white rounded"
+        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
       >
         Upload
       </button>
 
-      <p className="mt-3 text-sm">{status}</p>
+      <p className="mt-3 text-sm text-gray-600">
+        {status}
+      </p>
 
     </div>
-  );
+
+  )
 }
