@@ -5,8 +5,17 @@ import shutil
 from src.rag.pipeline import RAGPipeline
 from src.database.db import Database
 
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # later we can restrict this
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 pipeline = RAGPipeline()
 db = Database()
