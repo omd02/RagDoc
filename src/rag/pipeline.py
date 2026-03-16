@@ -1,7 +1,9 @@
 from src.ingestion.pdf_loader import load_pdf
 from src.ingestion.chunker import chunk_documents
 from src.retrieval.embeddings import EmbeddingModel
-from src.retrieval.vector_store import VectorStore
+from src.retrieval.vector_store import VectorStore  
+from src.database.db import Database
+from pathlib import Path
 
 
 class RAGPipeline:
@@ -12,10 +14,15 @@ class RAGPipeline:
 
         self.vector_store = VectorStore()
 
+        self.vector_store.load()
+
+        self.db = Database()
+
     def index_document(self, pdf_path):
-        """
-        Process and index a document.
-        """
+
+        filename = Path(pdf_path).name
+
+        self.db.add_document(filename, pdf_path)
 
         documents = load_pdf(pdf_path)
 
@@ -25,10 +32,9 @@ class RAGPipeline:
 
         self.vector_store.add_embeddings(embedded_chunks)
 
+        self.vector_store.save()
+
     def retrieve(self, query, top_k=5):
-        """
-        Retrieve relevant chunks for a query.
-        """
 
         query_embedding = self.embedding_model.model.encode(query)
 
