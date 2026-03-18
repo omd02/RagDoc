@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Depends
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from pathlib import Path
 import shutil
 from src.auth.models import UserRegister, UserLogin
@@ -6,16 +6,13 @@ from src.auth.auth import hash_password, verify_password, create_access_token
 from src.auth.dependencies import get_current_user
 from src.database.db import Database
 from src.rag.pipeline import RAGPipeline
-from src.database.db import Database
-from pathlib import Path
-import shutil
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # later we can restrict this
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,7 +35,7 @@ def register(user: UserRegister):
     existing = db.get_user_by_email(user.email)
 
     if existing:
-        return {"error": "User already exists"}
+        raise HTTPException(status_code=400, detail="User already exists")
 
     password_hash = hash_password(user.password)
 
@@ -52,13 +49,13 @@ def login(user: UserLogin):
     db_user = db.get_user_by_email(user.email)
 
     if not db_user:
-        return {"error": "Invalid credentials"}
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     user_id = db_user[0]
     password_hash = db_user[2]
 
     if not verify_password(user.password, password_hash):
-        return {"error": "Invalid credentials"}
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token(user_id)
 
@@ -66,7 +63,7 @@ def login(user: UserLogin):
 
 @app.post("/upload")
 async def upload_document(
-    file: UploadFile = File(...),
+    file: UploadFile,
     user_id: int = Depends(get_current_user)
 ):
 

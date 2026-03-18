@@ -22,13 +22,12 @@ API.interceptors.request.use((config) => {
 
 })
 
-export const uploadDocument = (file: File) => {
+export const register = (email: string, password: string) => {
+  return API.post("/register", { email, password })
+}
 
-  const formData = new FormData()
-  formData.append("file", file)
-
-  return API.post("/upload", formData)
-
+export const login = (email: string, password: string) => {
+  return API.post("/login", { email, password })
 }
 
 export const getDocuments = () => {
@@ -47,6 +46,19 @@ export const queryDocuments = (query: string) => {
 
   return API.post("/query", null, {
     params: { query }
+  })
+
+}
+
+export const uploadDocument = (file: File) => {
+
+  const formData = new FormData()
+  formData.append("file", file)
+
+  return API.post("/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data"
+    }
   })
 
 }

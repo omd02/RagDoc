@@ -22,7 +22,7 @@ def create_access_token(user_id: int):
 
     payload = {
         "user_id": user_id,
-        "exp": expire
+        "exp": int(expire.timestamp())
     }
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)

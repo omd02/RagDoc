@@ -16,13 +16,7 @@ class RAGPipeline:
 
         self.vector_store.load()
 
-        self.db = Database()
-
     def index_document(self, pdf_path):
-
-        filename = Path(pdf_path).name
-
-        self.db.add_document(filename, pdf_path)
 
         documents = load_pdf(pdf_path)
 
