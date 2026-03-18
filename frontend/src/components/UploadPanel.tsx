@@ -7,7 +7,7 @@ interface UploadPanelProps {
 
 export default function UploadPanel({
   refreshDocuments,
-}: UploadPanelProps): JSX.Element {
+}: UploadPanelProps) {
 
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState("")

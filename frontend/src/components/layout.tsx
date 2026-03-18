@@ -4,9 +4,10 @@ import Sidebar from "./Sidebar"
 
 interface LayoutProps {
   children: ReactNode
+  refreshKey?: number
 }
 
-export default function Layout({ children }: LayoutProps) {
+export default function Layout({ children , refreshKey }: LayoutProps) {
 
   return (
 
@@ -16,7 +17,7 @@ export default function Layout({ children }: LayoutProps) {
 
       <div className="flex flex-1 overflow-hidden">
 
-        <Sidebar />
+        <Sidebar refreshKey={refreshKey} />
 
         <main className="flex-1 bg-slate-900 text-white p-8 overflow-y-auto">
 
