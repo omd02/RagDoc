@@ -11,20 +11,7 @@ class EmbeddingModel:
         Generate embeddings for chunk texts with contextual metadata.
         """
 
-        texts = []
-
-        for chunk in chunks:
-
-            metadata = chunk["metadata"]
-
-            contextual_text = (
-                f"Source: {metadata['source']}\n"
-                f"Page: {metadata['page']}\n"
-                f"{chunk['text']}"
-            )
-
-            texts.append(contextual_text)
-
+        texts = [chunk["text"] for chunk in chunks]
         embeddings = self.model.encode(texts)
 
         for chunk, embedding in zip(chunks, embeddings):

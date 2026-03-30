@@ -1,11 +1,15 @@
+import os
 from datetime import datetime, timedelta
 from jose import jwt
 from passlib.context import CryptContext
+from dotenv import load_dotenv
 
-SECRET_KEY = "supersecretkey"
-ALGORITHM = "HS256"
+load_dotenv()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 def hash_password(password: str):
@@ -17,7 +21,9 @@ def verify_password(password: str, hashed: str):
 
 
 def create_access_token(user_id: int):
-
+    print(f"Generating access token for user_id: {user_id}")
+    import time
+    start = time.time()
     expire = datetime.utcnow() + timedelta(hours=24)
 
     payload = {
@@ -26,5 +32,5 @@ def create_access_token(user_id: int):
     }
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
+    print(f"Token generated in {time.time() - start:.4f}s")
     return token

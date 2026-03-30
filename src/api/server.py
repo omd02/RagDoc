@@ -8,18 +8,24 @@ from src.database.db import Database
 from src.rag.pipeline import RAGPipeline
 from fastapi.middleware.cors import CORSMiddleware
 
+from contextlib import asynccontextmanager
+
+# Global instances
+db = Database()
+# Pipeline loads heavy models, so we still do it here but ensure it's initialized before routes
+print("Initializing RAG Pipeline...")
+pipeline = RAGPipeline()
+print("Initialization complete.")
+
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-pipeline = RAGPipeline()
-db = Database()
 
 UPLOAD_DIR = "uploads"
 Path(UPLOAD_DIR).mkdir(exist_ok=True)
@@ -31,67 +37,99 @@ def home():
 
 @app.post("/register")
 def register(user: UserRegister):
+    print(f"Registering user: {user.email}")
+    try:
+        existing = db.get_user_by_email(user.email)
 
-    existing = db.get_user_by_email(user.email)
+        if existing:
+            print(f"User already exists: {user.email}")
+            raise HTTPException(status_code=400, detail="User already exists")
 
-    if existing:
-        raise HTTPException(status_code=400, detail="User already exists")
+        print(f"Hashing password for {user.email}")
+        password_hash = hash_password(user.password)
 
-    password_hash = hash_password(user.password)
+        print(f"Creating user in database: {user.email}")
+        user_id = db.create_user(user.email, password_hash)
 
-    user_id = db.create_user(user.email, password_hash)
-
-    return {"message": "User created", "user_id": user_id}
+        print(f"User created successfully: {user.email}, ID: {user_id}")
+        return {"message": "User created", "user_id": user_id}
+    except Exception as e:
+        print(f"Registration error for {user.email}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/login")
 def login(user: UserLogin):
+    print(f"Login attempt for: {user.email}")
+    try:
+        db_user = db.get_user_by_email(user.email)
 
-    db_user = db.get_user_by_email(user.email)
+        if not db_user:
+            print(f"Login failed: User {user.email} not found")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        user_id = db_user[0]
+        password_hash = db_user[2]
 
-    user_id = db_user[0]
-    password_hash = db_user[2]
+        print(f"Verifying password for {user.email}")
+        if not verify_password(user.password, password_hash):
+            print(f"Login failed: Invalid password for {user.email}")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not verify_password(user.password, password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        print(f"Creating access token for {user.email}")
+        token = create_access_token(user_id)
 
-    token = create_access_token(user_id)
-
-    return {"access_token": token}
+        print(f"Login successful for {user.email}")
+        return {"access_token": token}
+    except Exception as e:
+        print(f"Login error for {user.email}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/upload")
 async def upload_document(
     file: UploadFile,
     user_id: int = Depends(get_current_user)
 ):
-
+    print(f"File upload request: {file.filename} for user {user_id}")
     file_path = f"{UPLOAD_DIR}/{user_id}_{file.filename}"
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    doc_id = db.add_document(user_id, file.filename, file_path)
+        doc_id = db.add_document(user_id, file.filename, file_path)
+        print(f"Indexing document: {file.filename}")
+        pipeline.index_document(file_path, user_id)
+        print(f"Indexing complete for: {file.filename}")
 
-    pipeline.index_document(file_path)
-
-    return {
-        "message": "Document uploaded",
-        "document_id": doc_id
-    }
-
-
+        return {
+            "message": "Document uploaded",
+            "document_id": doc_id
+        }
+    except Exception as e:
+        print(f"Upload error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/query")
 def query_documents(
     query: str,
     user_id: int = Depends(get_current_user)
 ):
-
-    results = pipeline.retrieve(query)
-
-    return {"results": results}
+    print(f"Query request: '{query}' for user {user_id}")
+    try:
+        result = pipeline.answer(query, user_id)
+        print(f"Answer generated successfully")
+        return result
+    except Exception as e:
+        print(f"Query error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/documents")
 def get_documents(user_id: int = Depends(get_current_user)):
@@ -117,3 +155,7 @@ def delete_document(
     db.delete_document(doc_id)
 
     return {"message": "Document deleted"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)

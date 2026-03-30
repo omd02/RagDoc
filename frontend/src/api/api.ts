@@ -2,12 +2,19 @@ import axios from "axios"
 
 export interface SearchResult {
   text: string
-  source: string
-  page: number
+  metadata: {
+    source: string
+    page: number
+  }
+}
+
+export interface QueryResponse {
+  answer: string
+  context: SearchResult[]
 }
 
 const API = axios.create({
-  baseURL: "http://localhost:8000"
+  baseURL: import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
 })
 
 API.interceptors.request.use((config) => {
@@ -44,7 +51,7 @@ export const deleteDocument = (id: number) => {
 
 export const queryDocuments = (query: string) => {
 
-  return API.post("/query", null, {
+  return API.post<QueryResponse>("/query", null, {
     params: { query }
   })
 

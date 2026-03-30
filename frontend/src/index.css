@@ -2,15 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* remove browser default margins */
 html, body, #root {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
-}
-
-/* ensure app takes full screen */
-body {
-  background-color: #020617;
+  @apply bg-[#020617] overflow-hidden;
 }
