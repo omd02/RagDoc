@@ -31,7 +31,7 @@ class RAGPipeline:
 
     def retrieve(self, query, user_id: int, top_k=5):
 
-        query_embedding = self.embedding_model.model.encode(query)
+        query_embedding = self.embedding_model.encode(query)
 
         results = self.vector_store.search(query_embedding, user_id, top_k)
 
