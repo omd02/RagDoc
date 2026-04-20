@@ -1,8 +1,8 @@
 from fastembed import TextEmbedding
 
 def download():
-    print("Downloading fastembed model...")
-    # This will download the model to the default cache directory
+    print("Pre-downloading lightweight embedding model (BAAI/bge-small-en-v1.5)...")
+    # This downloads only the ONNX model (~130MB)
     TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
     print("Download complete.")
 
