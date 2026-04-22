@@ -70,7 +70,7 @@ class Generator:
             return f"Error during generation: {str(e)}"
 
 class DocumentGrader:
-    def __init__(self, model_id="llama3-8b-8192"):
+    def __init__(self, model_id="llama-3.1-8b-instant"):
         api_key = os.environ.get("GROQ_API_KEY")
         self.client = Groq(api_key=api_key) if api_key else None
         self.model_id = model_id
