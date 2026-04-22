@@ -3,15 +3,19 @@ import numpy as np
 import pickle
 from pathlib import Path
 from rank_bm25 import BM25Okapi
+
+# Resilient import for TextCrossEncoder
 try:
-    from fastembed import TextReranker
+    from fastembed import TextCrossEncoder
 except ImportError:
-    # Fallback for different fastembed versions
     try:
-        from fastembed.rerank.cross_encoder import TextReranker
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
     except ImportError:
-        # If both fail, we will know exactly which one was tried
-        raise ImportError("Could not import TextReranker from fastembed. Please ensure fastembed>=0.3.4 is installed.")
+        # Fallback for older fastembed versions where it might be named TextReranker
+        try:
+            from fastembed import TextReranker as TextCrossEncoder
+        except ImportError:
+            raise ImportError("Could not import TextCrossEncoder or TextReranker from fastembed. Please ensure fastembed>=0.3.4 is installed.")
 
 
 class VectorStore:
@@ -23,7 +27,7 @@ class VectorStore:
         self.chunks = []
         self.bm25 = None
         # Using fastembed's ONNX-based re-ranker for extreme memory efficiency (<100MB RAM)
-        self.reranker = TextReranker(model_name="mixedbread-ai/mxbai-rerank-xsmall-v1")
+        self.reranker = TextCrossEncoder(model_name="mixedbread-ai/mxbai-rerank-xsmall-v1")
 
     def _tokenize(self, text):
         """Simple tokenizer for BM25."""
