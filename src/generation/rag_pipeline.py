@@ -6,11 +6,9 @@ load_dotenv()
 
 class Generator:
 
-    def __init__(self, model_id="llama-3.3-70b-versatile"):
+    def __init__(self, model_id="llama3-8b-8192"):
         """
-        Initialize the Groq generator.
-        Defaulting to llama-3.3-70b-versatile for high-quality "smart" responses.
-        llama3-8b-8192 is a faster, smaller alternative.
+        Using llama3-8b-8192 for faster, more memory-efficient responses on free tiers.
         """
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
@@ -72,7 +70,7 @@ class Generator:
             return f"Error during generation: {str(e)}"
 
 class DocumentGrader:
-    def __init__(self, model_id="llama-3.3-70b-versatile"):
+    def __init__(self, model_id="llama3-8b-8192"):
         api_key = os.environ.get("GROQ_API_KEY")
         self.client = Groq(api_key=api_key) if api_key else None
         self.model_id = model_id

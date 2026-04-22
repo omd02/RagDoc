@@ -1,6 +1,7 @@
 import faiss
 import numpy as np
 import pickle
+import gc # For explicit memory cleanup
 from pathlib import Path
 from rank_bm25 import BM25Okapi
 
@@ -11,11 +12,10 @@ except ImportError:
     try:
         from fastembed.rerank.cross_encoder import TextCrossEncoder
     except ImportError:
-        # Fallback for older fastembed versions where it might be named TextReranker
         try:
             from fastembed import TextReranker as TextCrossEncoder
         except ImportError:
-            raise ImportError("Could not import TextCrossEncoder or TextReranker from fastembed. Please ensure fastembed>=0.3.4 is installed.")
+            raise ImportError("Could not import TextCrossEncoder or TextReranker from fastembed.")
 
 
 class VectorStore:
@@ -26,14 +26,11 @@ class VectorStore:
         self.index = faiss.IndexFlatIP(dimension)
         self.chunks = []
         self.bm25 = None
-        self.reranker = None # Lazy load to save RAM at startup
+        self.reranker = None 
 
     def _get_reranker(self):
-        if self.reranker is None:
-            print("Loading Re-ranker model into RAM...")
-            # Using the absolute smallest model available
-            self.reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2", threads=1)
-        return self.reranker
+        # We don't use self.reranker here to allow explicit deletion in search
+        return TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2", threads=1)
 
     def _tokenize(self, text):
         """Simple tokenizer for BM25."""
@@ -44,9 +41,10 @@ class VectorStore:
         embeddings = []
         for chunk in chunks:
             chunk["user_id"] = user_id
-            # Pre-tokenize for BM25
-            chunk["tokens"] = self._tokenize(chunk["text"])
             embeddings.append(chunk["embedding"])
+            
+            # Temporary tokens for BM25 build
+            chunk["_tmp_tokens"] = self._tokenize(chunk["text"])
 
         embeddings = np.array(embeddings).astype("float32")
         faiss.normalize_L2(embeddings)
@@ -54,67 +52,73 @@ class VectorStore:
         self.index.add(embeddings)
         self.chunks.extend(chunks)
         
-        # Re-initialize BM25 with all chunks
-        corpus = [c["tokens"] for c in self.chunks]
+        # Build BM25 and then CLEAN UP
+        corpus = [c["_tmp_tokens"] for c in self.chunks]
         self.bm25 = BM25Okapi(corpus)
         
+        # CRITICAL: Remove heavy data from RAM
+        for c in self.chunks:
+            if "embedding" in c: del c["embedding"]
+            if "_tmp_tokens" in c: del c["_tmp_tokens"]
+            if "tokens" in c: del c["tokens"]
+        
+        gc.collect() # Force cleanup
         print(f"Total chunks in memory: {len(self.chunks)}")
 
-    def search(self, query_text: str, query_embedding, user_id: int, top_k=5, use_hybrid=True):
-        """
-        Performs search using Vector search, BM25, RRF, and Cross-Encoder Re-ranking.
-        """
+    def search(self, query_text: str, query_embedding, user_id: int, top_k=5):
         print(f"Searching for: '{query_text}' for user {user_id}")
         
         # 1. Vector Search
         query_vector = np.array([query_embedding]).astype("float32")
         faiss.normalize_L2(query_vector)
-        # Search more than top_k for filtering and fusion
-        v_scores, v_indices = self.index.search(query_vector, min(len(self.chunks), 50))
+        v_scores, v_indices = self.index.search(query_vector, min(len(self.chunks), 30))
         
         # 2. BM25 Search
+        # Re-tokenize query on the fly
         tokenized_query = self._tokenize(query_text)
         bm25_scores = self.bm25.get_scores(tokenized_query) if self.bm25 else []
         
         # 3. Reciprocal Rank Fusion (RRF)
-        # We combine the rankings from both methods
         rrf_scores = {}
-        k = 60 # Standard constant for RRF
+        k = 60
         
-        # Vector rankings
         for rank, idx in enumerate(v_indices[0]):
             if idx == -1: continue
             if self.chunks[idx].get("user_id") == user_id:
                 rrf_scores[idx] = rrf_scores.get(idx, 0) + 1 / (rank + k)
                 
-        # BM25 rankings (sort scores to get ranks)
         bm25_ranks = np.argsort(bm25_scores)[::-1]
         for rank, idx in enumerate(bm25_ranks):
-            if bm25_scores[idx] <= 0: continue # Only consider relevant matches
+            if bm25_scores[idx] <= 0: continue
             if self.chunks[idx].get("user_id") == user_id:
                 rrf_scores[idx] = rrf_scores.get(idx, 0) + 1 / (rank + k)
                 
-        # Sort by RRF score
         sorted_indices = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
-        top_candidates = [self.chunks[i] for i in sorted_indices[:10]] # Reduced pool for 512MB RAM
+        top_candidates = [self.chunks[i] for i in sorted_indices[:8]] # Very tight pool for RAM
 
         if not top_candidates:
             return []
 
-        # 4. Cross-Encoder Re-ranking (FastEmbed ONNX version)
-        # lazy load to ensure RAM is freed for other tasks
-        reranker = self._get_reranker()
-        top_texts = [c["text"] for c in top_candidates]
-        rerank_results = list(reranker.rerank(query_text, top_texts))
-        
-        # fastembed returns a list of scores (floats) in the same order as input
-        # We match them back to our candidates
-        for i, score in enumerate(rerank_results):
-            top_candidates[i]["rerank_score"] = score
+        # 4. Use-and-Toss Re-ranking
+        # Load, use, and immediately discard to keep RAM < 512MB
+        try:
+            reranker = self._get_reranker()
+            top_texts = [c["text"] for c in top_candidates]
+            rerank_results = list(reranker.rerank(query_text, top_texts))
+            
+            for i, score in enumerate(rerank_results):
+                top_candidates[i]["rerank_score"] = score
+            
+            # Explicitly delete reranker and trigger GC
+            del reranker
+            gc.collect()
+        except Exception as e:
+            print(f"Reranking skipped due to memory/error: {e}")
+            # Fallback to RRF order
+            for i, c in enumerate(top_candidates):
+                c["rerank_score"] = 1.0 / (i + 1)
             
         final_results = sorted(top_candidates, key=lambda x: x.get("rerank_score", -100), reverse=True)
-        
-        print(f"Found {len(final_results[:top_k])} high-quality chunks after re-ranking")
         return final_results[:top_k]
 
     def save(self, path="storage"):
