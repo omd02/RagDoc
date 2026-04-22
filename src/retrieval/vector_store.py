@@ -26,8 +26,8 @@ class VectorStore:
         self.index = faiss.IndexFlatIP(dimension)
         self.chunks = []
         self.bm25 = None
-        # Using fastembed's ONNX-based re-ranker for extreme memory efficiency (<100MB RAM)
-        self.reranker = TextCrossEncoder(model_name="mixedbread-ai/mxbai-rerank-xsmall-v1")
+        # Using an ultra-lightweight ONNX re-ranker (80MB) for maximum memory efficiency on 512MB RAM
+        self.reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2")
 
     def _tokenize(self, text):
         """Simple tokenizer for BM25."""
