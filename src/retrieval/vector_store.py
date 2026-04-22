@@ -3,7 +3,7 @@ import numpy as np
 import pickle
 from pathlib import Path
 from rank_bm25 import BM25Okapi
-from sentence_transformers import CrossEncoder
+from fastembed import TextReranker
 
 
 class VectorStore:
@@ -14,8 +14,8 @@ class VectorStore:
         self.index = faiss.IndexFlatIP(dimension)
         self.chunks = []
         self.bm25 = None
-        # Using a highly efficient and effective re-ranker
-        self.reranker = CrossEncoder('mixedbread-ai/mxbai-rerank-xsmall-v1')
+        # Using fastembed's ONNX-based re-ranker for extreme memory efficiency (<100MB RAM)
+        self.reranker = TextReranker(model_name="mixedbread-ai/mxbai-rerank-xsmall-v1")
 
     def _tokenize(self, text):
         """Simple tokenizer for BM25."""
@@ -83,16 +83,17 @@ class VectorStore:
         if not top_candidates:
             return []
 
-        # 4. Cross-Encoder Re-ranking
-        # This is the most accurate step: compare query directly with each chunk
-        pairs = [[query_text, c["text"]] for c in top_candidates]
-        rerank_scores = self.reranker.predict(pairs)
+        # 4. Cross-Encoder Re-ranking (FastEmbed ONNX version)
+        # fastembed.rerank takes a query and a list of texts
+        top_texts = [c["text"] for c in top_candidates]
+        rerank_results = list(self.reranker.rerank(query_text, top_texts))
         
-        # Sort candidates by re-ranker score
-        for i, score in enumerate(rerank_scores):
-            top_candidates[i]["rerank_score"] = score
+        # fastembed returns objects with 'index' and 'score'
+        # We match them back to our candidates
+        for res in rerank_results:
+            top_candidates[res.index]["rerank_score"] = res.score
             
-        final_results = sorted(top_candidates, key=lambda x: x["rerank_score"], reverse=True)
+        final_results = sorted(top_candidates, key=lambda x: x.get("rerank_score", -100), reverse=True)
         
         print(f"Found {len(final_results[:top_k])} high-quality chunks after re-ranking")
         return final_results[:top_k]
