@@ -3,7 +3,15 @@ import numpy as np
 import pickle
 from pathlib import Path
 from rank_bm25 import BM25Okapi
-from fastembed import TextReranker
+try:
+    from fastembed import TextReranker
+except ImportError:
+    # Fallback for different fastembed versions
+    try:
+        from fastembed.rerank.cross_encoder import TextReranker
+    except ImportError:
+        # If both fail, we will know exactly which one was tried
+        raise ImportError("Could not import TextReranker from fastembed. Please ensure fastembed>=0.3.4 is installed.")
 
 
 class VectorStore:
