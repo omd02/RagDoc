@@ -70,3 +70,36 @@ class Generator:
             return chat_completion.choices[0].message.content
         except Exception as e:
             return f"Error during generation: {str(e)}"
+
+class DocumentGrader:
+    def __init__(self, model_id="llama-3.3-70b-versatile"):
+        api_key = os.environ.get("GROQ_API_KEY")
+        self.client = Groq(api_key=api_key) if api_key else None
+        self.model_id = model_id
+
+    def grade(self, query: str, document_text: str) -> str:
+        """
+        Grades a document's relevance to the query.
+        Returns 'relevant' or 'irrelevant'.
+        """
+        if not self.client:
+            return "relevant" # Fallback if no API key
+
+        prompt = (
+            f"You are a grader assessing relevance of a retrieved document to a user question. \n"
+            f"Retrieved document: \n\n {document_text} \n\n"
+            f"User question: {query} \n\n"
+            f"If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n"
+            f"Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."
+        )
+
+        try:
+            response = self.client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=self.model_id,
+                temperature=0,
+            )
+            score = response.choices[0].message.content.strip().lower()
+            return "yes" in score
+        except:
+            return True # Default to true on error

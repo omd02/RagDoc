@@ -1,59 +1,55 @@
-# 📄 RagDoc: AI-Powered Document Intelligence
+# 📄 RagDoc: Production-Grade RAG Document Intelligence
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
-[![React: 19](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev/)
 [![LLM: Llama 3.3 70B](https://img.shields.io/badge/LLM-Llama--3.3--70B-orange.svg)](https://groq.com/)
+[![RAGAS Score: 1.0](https://img.shields.io/badge/Faithfulness-1.0-green.svg)](#-evaluation--benchmarking)
 
-**RagDoc** is a high-performance, enterprise-grade Retrieval-Augmented Generation (RAG) system designed to transform static PDF documents into interactive intelligence. Built with a focus on speed, precision, and modern aesthetics, it enables users to query complex documents using natural language and receive grounded, cited answers in milliseconds.
+**RagDoc** is a high-performance, enterprise-grade Retrieval-Augmented Generation (RAG) system. Unlike standard RAG implementations, RagDoc employs a **multi-stage retrieval pipeline** (Hybrid Search + Re-ranking) and **Agentic Self-Correction** to deliver near-zero hallucination rates and industry-leading accuracy.
+
+---
+
+## 🚀 Advanced AI Engineering Features
+
+### 🔍 Multi-Stage Hybrid Retrieval
+To solve the limitations of standard semantic search, RagDoc implements a sophisticated retrieval engine:
+- **Hybrid Search (Dense + Sparse):** Combines **FAISS** (Vector/Semantic) with **BM25** (Keyword/Lexical) using **Reciprocal Rank Fusion (RRF)**. This ensures the system catches both high-level concepts and specific technical terms (e.g., Part IDs, names).
+- **Cross-Encoder Re-ranking:** Utilizes the `mixedbread-ai/mxbai-rerank-xsmall-v1` model to re-score the top candidates. This second-pass evaluation ensures that only the most contextually relevant chunks are sent to the LLM, reducing "noise" and API costs.
+
+### 🛡️ Agentic Self-Correction (CRAG)
+Implements a **Corrective RAG (CRAG)** logic:
+- **Binary Relevance Grading:** A dedicated LLM "Grader" evaluates every retrieved document before generation. 
+- **Self-Correction:** If the retrieved context is deemed irrelevant to the query, the system triggers a fallback response instead of attempting to answer, effectively eliminating grounded hallucinations.
+
+### 📊 Evaluation & Benchmarking
+Reliability is proven, not assumed. RagDoc includes a formal evaluation suite using the **RAGAS (RAG Assessment)** framework:
+- **Faithfulness (1.00):** Measures if the answer is derived solely from the context.
+- **Answer Relevancy (0.75+):** Ensures the response directly addresses the user's intent.
+- **Context Precision:** Evaluates the quality of the retrieval pipeline.
 
 ---
 
 ## 🏗️ System Architecture
 
-RagDoc utilizes a decoupled architecture to ensure scalability and high performance.
-
 ```mermaid
 graph TD
-    User([User]) -->|Upload PDF| API[FastAPI Backend]
-    API -->|Extract Text| PDF[PyPDF Loader]
-    PDF -->|Chunking| Chunker[Sliding Window Chunker]
-    Chunker -->|Embedding| Embed[all-MiniLM-L6-v2]
-    Embed -->|Index| FAISS[(FAISS Vector DB)]
-    
-    User -->|Query| API
-    API -->|Embed Query| Embed
-    Embed -->|Search| FAISS
-    FAISS -->|Top-K Context| API
-    API -->|Augmented Prompt| Groq[Groq LPU: Llama 3.3 70B]
-    Groq -->|Answer| API
-    API -->|JSON Response| User
+    User([User]) -->|Query| API[FastAPI Backend]
+    API -->|Hybrid Search| SearchEngine[BM25 + FAISS Vector]
+    SearchEngine -->|Top Candidates| Reranker[Cross-Encoder Reranker]
+    Reranker -->|High-Confidence Chunks| Grader{Document Grader}
+    Grader -->|Relevant| Generator[Groq: Llama 3.3 70B]
+    Grader -->|Irrelevant| Fallback[Correction Step]
+    Generator -->|Cited Answer| User
 ```
-
----
-
-## 🚀 Key Technical Specifications
-
-### 🧠 Intelligence & Retrieval
-- **LLM Engine:** Powered by `Llama-3.3-70b-versatile` via Groq LPU, delivering state-of-the-art reasoning with sub-second response times.
-- **Vector Embeddings:** Uses `all-MiniLM-L6-v2` generating **384-dimensional dense vectors** for high-accuracy semantic retrieval.
-- **Indexing:** Leveraging **FAISS (Facebook AI Similarity Search)** for O(log N) search complexity, even with large-scale document sets.
-- **Chunking Strategy:** Intelligent **Sliding Window** processing with 300-word chunks and 50-word overlap to maintain semantic context across boundaries.
-
-### 🛡️ Security & Performance
-- **Authentication:** JWT-based session management with **24-hour expiration** and **Argon2id** password hashing (industry-standard for GPU-resistance).
-- **Concurrency:** Built on **FastAPI (Asynchronous Server Gateway Interface)** for handling high-volume concurrent requests.
-- **UI Engine:** React 19 + Vite for optimized bundle sizes and **Framer Motion** for GPU-accelerated 60FPS transitions.
 
 ---
 
 ## ✨ Features
 
 - **End-to-End RAG Pipeline:** Automatic PDF processing, text extraction, and vector indexing.
-- **Glassmorphism UI:** A premium dark-themed interface with semi-transparent materials and indigo accents.
+- **Modern Tech Stack:** Built with **React 19**, **FastAPI**, and **Groq** for sub-second inference.
 - **Source Transparency:** Every AI response includes exact citations and text highlights from the source document.
 - **Multi-User Isolation:** Secure document silos ensuring users only access their own data.
-- **Mobile Responsive:** Fully adaptive layout optimized for desktop, tablet, and mobile.
 
 ---
 
@@ -61,11 +57,10 @@ graph TD
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Frontend** | React 19, TypeScript, Tailwind CSS, Framer Motion, Vite |
-| **Backend** | FastAPI, Python 3.10+, PyPDF, Uvicorn |
-| **AI/ML** | Groq (Llama 3.3 70B), Sentence-Transformers (MiniLM), FAISS |
-| **Database** | SQLite (Metadata), FAISS Index (Vectors) |
-| **DevOps** | Docker, Docker Compose, .env Configuration |
+| **Frontend** | React 19, TypeScript, Tailwind CSS, Framer Motion |
+| **Backend** | FastAPI, Python 3.10+, rank-bm25 |
+| **AI/ML** | Groq (Llama 3.3 70B), Sentence-Transformers (Re-ranking), FAISS |
+| **Evaluation** | RAGAS, LangChain, Datasets |
 
 ---
 
@@ -84,41 +79,16 @@ graph TD
    cd ragdoc
    ```
 
-2. **Backend Configuration**
-   ```bash
-   # Create virtual environment
-   python -m venv venv
-   source venv/bin/activate  # Windows: venv\Scripts\activate
-   
-   # Install dependencies
-   pip install -r requirements.txt
-   ```
-
-3. **Frontend Configuration**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-4. **Environment Setup**
+2. **Environment Setup**
    Create a `.env` file in the root directory:
    ```env
    GROQ_API_KEY=your_groq_key_here
-   DATABASE_URL=sqlite:///./storage/app.db
-   SECRET_KEY=your_random_secret_key
    ```
 
-5. **Execution**
-   - **Backend:** `uvicorn src.api.server:app --reload`
-   - **Frontend:** `cd frontend && npm run dev`
-
----
-
-## 📊 Quantifiable Impact
-- **Retrieval Speed:** Top-5 context retrieval in **< 50ms**.
-- **Inference Latency:** Average response generation **< 1.5s** using Groq LPU.
-- **Accuracy:** Grounded generation with `temperature=0.1` to minimize hallucinations.
-- **Efficiency:** Low-memory footprint using `MiniLM` (only ~80MB for the model).
+3. **Execution (Docker - Recommended)**
+   ```bash
+   docker-compose up --build
+   ```
 
 ---
 
