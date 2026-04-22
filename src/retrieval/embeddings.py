@@ -4,8 +4,8 @@ import numpy as np
 class EmbeddingModel:
     def __init__(self, model_name="BAAI/bge-small-en-v1.5"):
         # fastembed is much lighter than sentence-transformers and doesn't require torch
-        # "BAAI/bge-small-en-v1.5" is a high-performance, small model (384 dim)
-        self.model = TextEmbedding(model_name=model_name)
+        # threads=1 ensures stability on limited CPU environments (Render Free Tier)
+        self.model = TextEmbedding(model_name=model_name, threads=1)
 
     def encode(self, text):
         """

@@ -26,8 +26,14 @@ class VectorStore:
         self.index = faiss.IndexFlatIP(dimension)
         self.chunks = []
         self.bm25 = None
-        # Using an ultra-lightweight ONNX re-ranker (80MB) for maximum memory efficiency on 512MB RAM
-        self.reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2")
+        self.reranker = None # Lazy load to save RAM at startup
+
+    def _get_reranker(self):
+        if self.reranker is None:
+            print("Loading Re-ranker model into RAM...")
+            # Using the absolute smallest model available
+            self.reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2", threads=1)
+        return self.reranker
 
     def _tokenize(self, text):
         """Simple tokenizer for BM25."""
@@ -90,15 +96,16 @@ class VectorStore:
                 
         # Sort by RRF score
         sorted_indices = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
-        top_candidates = [self.chunks[i] for i in sorted_indices[:20]] # Take top 20 for re-ranking
+        top_candidates = [self.chunks[i] for i in sorted_indices[:10]] # Reduced pool for 512MB RAM
 
         if not top_candidates:
             return []
 
         # 4. Cross-Encoder Re-ranking (FastEmbed ONNX version)
-        # fastembed.rerank takes a query and a list of texts
+        # lazy load to ensure RAM is freed for other tasks
+        reranker = self._get_reranker()
         top_texts = [c["text"] for c in top_candidates]
-        rerank_results = list(self.reranker.rerank(query_text, top_texts))
+        rerank_results = list(reranker.rerank(query_text, top_texts))
         
         # fastembed returns objects with 'index' and 'score'
         # We match them back to our candidates

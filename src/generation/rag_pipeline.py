@@ -77,17 +77,20 @@ class DocumentGrader:
         self.client = Groq(api_key=api_key) if api_key else None
         self.model_id = model_id
 
-    def grade(self, query: str, document_text: str) -> str:
+    def grade(self, query: str, document_text: str) -> bool:
         """
         Grades a document's relevance to the query.
-        Returns 'relevant' or 'irrelevant'.
+        Returns True if relevant, False otherwise.
         """
         if not self.client:
-            return "relevant" # Fallback if no API key
+            return True # Fallback if no API key
+
+        # Only use the first 1500 chars for grading to save tokens and improve speed
+        snippet = document_text[:1500]
 
         prompt = (
             f"You are a grader assessing relevance of a retrieved document to a user question. \n"
-            f"Retrieved document: \n\n {document_text} \n\n"
+            f"Retrieved document snippet: \n\n {snippet} \n\n"
             f"User question: {query} \n\n"
             f"If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n"
             f"Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."
