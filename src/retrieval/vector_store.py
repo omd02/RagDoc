@@ -107,10 +107,10 @@ class VectorStore:
         top_texts = [c["text"] for c in top_candidates]
         rerank_results = list(reranker.rerank(query_text, top_texts))
         
-        # fastembed returns objects with 'index' and 'score'
+        # fastembed returns a list of scores (floats) in the same order as input
         # We match them back to our candidates
-        for res in rerank_results:
-            top_candidates[res.index]["rerank_score"] = res.score
+        for i, score in enumerate(rerank_results):
+            top_candidates[i]["rerank_score"] = score
             
         final_results = sorted(top_candidates, key=lambda x: x.get("rerank_score", -100), reverse=True)
         
